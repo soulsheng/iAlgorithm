@@ -1,5 +1,9 @@
 #include "iAes.h"
-#include "macro.h"
+
+#include <fstream>
+using namespace std;
+
+#define BLOCK_SIZE		16
 
 const unsigned char CAES::SBox[256] = {
 	0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5,
@@ -109,20 +113,20 @@ bool CAES::AesInit(unsigned char* pKey, int KeySize, int EncryptMode)
 	switch (KeySize)
 	{
 	case AES_128_TYPE:
-		Nk = 4;
-		Nr = 10;
+		m_Nk = 4;
+		m_Nr = 10;
 		AesType = AES_128_TYPE;
 		break;
 		
 	case AES_192_TYPE:
-		Nk = 6;
-		Nr = 12;
+		m_Nk = 6;
+		m_Nr = 12;
 		AesType = AES_192_TYPE;
 		break;
 
 	case AES_256_TYPE:
-		Nk = 8;
-		Nr = 14;
+		m_Nk = 8;
+		m_Nr = 14;
 		AesType = AES_256_TYPE;
 		break;
 
@@ -320,23 +324,23 @@ void CAES::AESKeyExpansion()
 	memset(RoundKey, 0x00, sizeof(RoundKey));
 	memcpy(RoundKey, key, 32);
 
-	i = Nk;
+	i = m_Nk;
 
-	while (i < 4 * (Nr + 1))
+	while (i < 4 * (m_Nr + 1))
 	{
 		dwTemp = RoundKey[i - 1];
-		if (i % Nk == 0)
+		if (i % m_Nk == 0)
 		{
 			RotWord((unsigned char*)&dwTemp);
 			SubWord((unsigned char*)&dwTemp);
-			dwTemp ^= Rcon[i / Nk];
+			dwTemp ^= Rcon[i / m_Nk];
 		}
-		else if ((Nk > 6) && (i % Nk == 4))
+		else if ((m_Nk > 6) && (i % m_Nk == 4))
 		{
 			SubWord((unsigned char*)&dwTemp);
 		}
 
-		RoundKey[i] = RoundKey[i - Nk] ^ dwTemp;
+		RoundKey[i] = RoundKey[i - m_Nk] ^ dwTemp;
 		i++;
 	}
 }
@@ -351,7 +355,7 @@ void CAES::AesRoundEncrypt(unsigned char* pBlockIn, unsigned char* pBlockOut)
 
 	AddRoundKey((unsigned char*)state, (unsigned char*)RoundKey);
 
-	for (int ulRound = 1; ulRound <= Nr - 1; ulRound++)
+	for (int ulRound = 1; ulRound <= m_Nr - 1; ulRound++)
 	{
 		SubByte((unsigned char*)state);
 		ShiftRows((unsigned char*)state);
@@ -361,7 +365,7 @@ void CAES::AesRoundEncrypt(unsigned char* pBlockIn, unsigned char* pBlockOut)
 
 	SubByte((unsigned char*)state);
 	ShiftRows((unsigned char*)state);
-	AddRoundKey((unsigned char*)state, (unsigned char*)RoundKey + Nr * 16);
+	AddRoundKey((unsigned char*)state, (unsigned char*)RoundKey + m_Nr * 16);
 
 	memcpy(pBlockOut, state, 16);
 }
@@ -374,13 +378,13 @@ void CAES::AesRoundDecrypt(unsigned char* pBlockIn, unsigned char* pBlockOut)
 
 	AESKeyExpansion();
 
-	AddRoundKey((unsigned char*)state, (unsigned char*)RoundKey + Nr * 16);
+	AddRoundKey((unsigned char*)state, (unsigned char*)RoundKey + m_Nr * 16);
 
-	for (int ulRound = 1; ulRound <= Nr - 1; ulRound++)
+	for (int ulRound = 1; ulRound <= m_Nr - 1; ulRound++)
 	{
 		InvShiftRows((unsigned char*)state);
 		InvSubBytes((unsigned char*)state);
-		AddRoundKey((unsigned char*)state, (unsigned char*)RoundKey + Nr * 16 - ulRound * 16);
+		AddRoundKey((unsigned char*)state, (unsigned char*)RoundKey + m_Nr * 16 - ulRound * 16);
 		InvMixColumns((unsigned char*)state);
 	}
 
@@ -416,6 +420,36 @@ bool CAES::Encrypt_ECB(unsigned char* pBufferIn, int BufferInSize, unsigned char
 	return true;
 }
 
+bool CAES::Encrypt_ECB(char* fileIn, char* fileOut)
+{
+	ifstream in;
+	ofstream out;
+
+	in.open(fileIn, ios::binary);
+	out.open(fileOut, ios::binary);
+
+	in.seekg(0, ios::end);
+	int nFileSize = in.tellg();
+
+	int nBufferSize = (nFileSize + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE;
+
+	char* pBufferFile = new char[nBufferSize];
+	char* pBufferFileOut = new char[nBufferSize];
+
+	in.seekg(0, ios::beg);
+	in.read(pBufferFile, nFileSize);
+
+	bool bret = Encrypt_ECB((unsigned char*)pBufferFile, nBufferSize,
+		(unsigned char*)pBufferFileOut, nBufferSize);
+
+	out.write(pBufferFileOut, nFileSize);
+
+	in.close();
+	out.close();
+
+	return bret;
+}
+
 bool CAES::Decrypt_ECB(unsigned char* pBufferIn, int BufferInSize, unsigned char* pBufferOut, int BufferOutSize)
 {
 	if (BufferInSize % 16 != 0)
@@ -439,6 +473,36 @@ bool CAES::Decrypt_ECB(unsigned char* pBufferIn, int BufferInSize, unsigned char
 	}
 
 	return true;
+}
+
+bool CAES::Decrypt_ECB(char* fileIn, char* fileOut)
+{
+	ifstream in;
+	ofstream out;
+
+	in.open(fileIn, ios::binary);
+	out.open(fileOut, ios::binary);
+
+	in.seekg(0, ios::end);
+	int nFileSize = in.tellg();
+
+	int nBufferSize = (nFileSize + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE;
+
+	char* pBufferFile = new char[nBufferSize];
+	char* pBufferFileOut = new char[nBufferSize];
+
+	in.seekg(0, ios::beg);
+	in.read(pBufferFile, nFileSize);
+
+	bool bret = Decrypt_ECB((unsigned char*)pBufferFile, nBufferSize,
+		(unsigned char*)pBufferFileOut, nBufferSize);
+
+	out.write(pBufferFileOut, nFileSize);
+
+	in.close();
+	out.close();
+
+	return bret;
 }
 
 bool CAES::Encrypt_CBC(unsigned char* pBufferIn, int BufferInSize, unsigned char* pBufferOut, int BufferOutSize)

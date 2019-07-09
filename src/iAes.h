@@ -1,6 +1,6 @@
 #pragma once
 
-class _declspec(dllexport) CAES
+class CAES
 {
 public:
 	CAES(void);
@@ -22,8 +22,8 @@ public:
 	};
 
 private:
-	int Nk;
-	int Nr;
+	int m_Nk;
+	int m_Nr;
 	static const int Nb;
 	unsigned long key[8];
 	unsigned char Iv[16];
@@ -43,6 +43,9 @@ public:
 
 	bool Encrypt_ECB(unsigned char* pBufferIn, int BufferInSize, unsigned char* pBufferOut, int BufferOutSize);
 	bool Decrypt_ECB(unsigned char* pBufferIn, int BufferInSize, unsigned char* pBufferOut, int BufferOutSize);
+
+	bool Encrypt_ECB(char* fileIn, char* fileOut);
+	bool Decrypt_ECB(char* fileIn, char* fileOut);
 
 	bool Encrypt_CBC(unsigned char* pBufferIn, int BufferInSize, unsigned char* pBufferOut, int BufferOutSize);
 	bool Decrypt_CBC(unsigned char* pBufferIn, int BufferInSize, unsigned char* pBufferOut, int BufferOutSize);

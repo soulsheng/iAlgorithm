@@ -1,0 +1,6 @@
+/vc12/ipch
+/vc12/Release
+/vc12/Debug
+/vc12/*.suo
+/vc12/*.opensdf
+/vc12/*.sdf
